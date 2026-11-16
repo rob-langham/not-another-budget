@@ -5,6 +5,7 @@ import org.jetbrains.exposed.dao.id.LongIdTable
 /** All money is stored as a signed Long in pence. Negative = money out. Dates are ISO-8601 text (yyyy-MM-dd). */
 
 object Users : LongIdTable("users") {
+    /** Who the user is. "local" while there is no sign-in. */
     val auth0Sub = varchar("auth0_sub", 200).uniqueIndex()
     val email = varchar("email", 320).nullable()
     val name = varchar("name", 200).nullable()

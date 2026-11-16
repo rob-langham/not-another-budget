@@ -1,8 +1,6 @@
 package app.longview.routes
 
 import app.longview.*
-import app.longview.auth.AUTH
-import app.longview.auth.currentUser
 import app.longview.db.*
 import app.longview.domain.CsvImport
 import app.longview.domain.Money
@@ -11,7 +9,6 @@ import app.longview.domain.Repeat
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
-import io.ktor.server.auth.authenticate
 import io.ktor.server.request.contentType
 import io.ktor.server.request.receive
 import io.ktor.server.request.receiveChannel
@@ -41,7 +38,7 @@ private val FIELDS = setOf("merchant", "description", "amount", "day_of_week", "
 
 fun Route.apiRoutes(cfg: AppConfig, today: () -> LocalDate) {
 
-    fun ApplicationCall.uid(): Long = currentUser(cfg)?.id ?: throw Unauthorized()
+    @Suppress("UnusedReceiverParameter") fun ApplicationCall.uid(): Long = LocalUser.id()
     fun views(uid: Long) = Views(Ledger.load(uid), today(), cfg.receiptsEmailDomain)
     fun ApplicationCall.idParam(name: String = "id") = parameters[name]?.toLongOrNull() ?: throw BadRequest("Bad id")
 
@@ -67,7 +64,7 @@ fun Route.apiRoutes(cfg: AppConfig, today: () -> LocalDate) {
         call.respond(if (ok) HttpStatusCode.Accepted else HttpStatusCode.UnprocessableEntity, mapOf("accepted" to ok))
     }
 
-    authenticate(AUTH, optional = cfg.devAuth) {
+    run {
         route("/api") {
             get("/me") {
                 val uid = call.uid()

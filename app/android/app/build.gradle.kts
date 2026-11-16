@@ -20,11 +20,6 @@ android {
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
-        // Auth0 callback: <scheme>://<domain>/android/<applicationId>/callback (add it to "Allowed Callback URLs").
-        // Pass with: flutter build apk -Pauth0Domain=your-tenant.eu.auth0.com  (or set AUTH0_DOMAIN in the environment)
-        manifestPlaceholders["auth0Domain"] = (project.findProperty("auth0Domain") as String?)
-            ?: System.getenv("AUTH0_DOMAIN") ?: "your-tenant.auth0.com"
-        manifestPlaceholders["auth0Scheme"] = (project.findProperty("auth0Scheme") as String?) ?: "app.longview"
         targetSdk = flutter.targetSdkVersion
         // Uses the version code from pubspec.yaml. When using split APKs, 1000 * ABI_VERSION
         // is added automatically by Flutter. (https://developer.android.com/studio/build/configure-apk-splits#configure-APK-versions)

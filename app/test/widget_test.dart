@@ -5,7 +5,6 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:longview/api.dart';
-import 'package:longview/auth.dart';
 import 'package:longview/screens/overview.dart';
 import 'package:longview/screens/rules.dart';
 import 'package:longview/shell.dart';
@@ -39,7 +38,7 @@ Api _fakeApi(Map<String, Object> routes) {
     if (body == null) return http.Response('{"error":"nope"}', 404);
     return http.Response(jsonEncode(body), 200, headers: {'content-type': 'application/json'});
   });
-  return Api(AuthService(), client: client);
+  return Api(client: client);
 }
 
 Widget _host(Api api, Widget child) => MultiProvider(

@@ -60,16 +60,10 @@ class AccountLogo extends StatelessWidget {
       child: Text(logo['letter'], style: TextStyle(color: Colors.white, fontFamily: display, fontWeight: FontWeight.w700, fontSize: size * .4)),
     );
     if (url == null) return Semantics(label: 'Letter icon', child: letter);
-    final api = context.read<Api>();
     if (url.startsWith('/')) url = '${Config.apiBaseUrl}$url';
-    return FutureBuilder<Map<String, String>>(
-      future: url.startsWith(Config.apiBaseUrl) ? api.headers() : Future.value(const {}),
-      builder: (context, h) => !h.hasData
-          ? letter
-          : ClipRRect(
-              borderRadius: BorderRadius.circular(size / 4),
-              child: Image.network(url!, headers: h.data, width: size, height: size, fit: BoxFit.cover, errorBuilder: (_, _, _) => letter),
-            ),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(size / 4),
+      child: Image.network(url, width: size, height: size, fit: BoxFit.cover, errorBuilder: (_, _, _) => letter),
     );
   }
 }

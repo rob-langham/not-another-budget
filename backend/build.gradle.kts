@@ -21,8 +21,6 @@ dependencies {
     implementation("io.ktor:ktor-server-netty:$ktor")
     implementation("io.ktor:ktor-server-content-negotiation:$ktor")
     implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor")
-    implementation("io.ktor:ktor-server-auth:$ktor")
-    implementation("io.ktor:ktor-server-auth-jwt:$ktor")
     implementation("io.ktor:ktor-server-cors:$ktor")
     implementation("io.ktor:ktor-server-status-pages:$ktor")
     implementation("io.ktor:ktor-server-call-logging:$ktor")

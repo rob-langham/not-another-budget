@@ -1,19 +1,18 @@
 #!/usr/bin/env python3
-"""Loads demo data (based on the Longview design) into a backend running with DEV_AUTH=true.
+"""Loads demo data (based on the Longview design) into a running backend.
 
-    python3 tools/seed_demo.py --api http://localhost:8080 --user demo
-Then run the app with --dart-define=DEV_USER=demo.
+    python3 tools/seed_demo.py --api http://localhost:8080
+Run it on an empty database: it stops if accounts already exist.
 """
 import argparse, json, urllib.request, datetime as dt
 
 p = argparse.ArgumentParser()
 p.add_argument("--api", default="http://localhost:8080")
-p.add_argument("--user", default="demo")
 a = p.parse_args()
 
 def call(method, path, body=None):
     req = urllib.request.Request(a.api + path, method=method, data=None if body is None else json.dumps(body).encode(),
-                                 headers={"Authorization": f"Bearer dev:{a.user}", "Content-Type": "application/json"})
+                                 headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req) as r:
         t = r.read()
         return json.loads(t) if t else None
@@ -26,7 +25,7 @@ def d(day, months_back=0):
     return dt.date(yy, mm, min(day, 28)).isoformat()
 
 if call("GET", "/api/accounts"):
-    raise SystemExit(f"User '{a.user}' already has accounts; pick another --user.")
+    raise SystemExit("There are already accounts. Start the backend with a fresh DB_PATH to load the demo.")
 cats = {c["name"]: c["id"] for c in call("GET", "/api/categories")}
 start = d(28, 9)
 monzo = call("POST", "/api/accounts", {"name": "Monzo Current", "type": "current", "source": "file_import", "openingBalance": 150000, "openingDate": start, "logoWebsite": "monzo.com"})["id"]
@@ -94,4 +93,4 @@ call("POST", "/api/receipts", {"text": f"Order placed {long_date}\nUSB-C chargin
 bal = {b["date"]: b["calculated"] for b in call("GET", f"/api/accounts/{monzo}/balances?days=31")}
 if d(10) in bal:
     call("PUT", f"/api/accounts/{monzo}/overrides", {"date": d(10), "balance": bal[d(10)] + 1360, "note": "Pending refund not in the feed yet"})
-print("Done. Sign in as DEV_USER=" + a.user)
+print("Done. Open the app to see the demo data.")

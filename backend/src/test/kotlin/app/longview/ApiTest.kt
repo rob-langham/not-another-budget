@@ -23,15 +23,16 @@ import kotlin.test.assertTrue
 
 /** Recreates the numbers shown in the Longview design and checks the API agrees. Date: Mon 16 Nov 2026. */
 class ApiTest {
-    private val cfg = AppConfig(0, ":memory:", null, null, true, emptyList(), "receipts.test", "s3cret")
+    private val cfg = AppConfig(0, "127.0.0.1", ":memory:", emptyList(), "receipts.test", "s3cret")
     private val clock = Clock.fixed(LocalDate.of(2026, 11, 16).atTime(12, 0).toInstant(ZoneOffset.UTC), ZoneOffset.UTC)
 
-    private fun run(user: String, block: suspend ApplicationTestBuilder.(HttpClient) -> Unit) = testApplication {
+    private fun run(block: suspend ApplicationTestBuilder.(HttpClient) -> Unit) = testApplication {
         Db.init(":memory:")
+        LocalUser.reset()
         application { module(cfg, clock) }
         val c = createClient {
             install(ContentNegotiation) { json(json) }
-            defaultRequest { header("Authorization", "Bearer dev:$user"); contentType(ContentType.Application.Json) }
+            defaultRequest { contentType(ContentType.Application.Json) }
         }
         block(c)
     }
@@ -42,14 +43,7 @@ class ApiTest {
         return r.body()
     }
 
-    @Test fun requiresSignIn() = testApplication {
-        Db.init(":memory:")
-        application { module(cfg, clock) }
-        assertEquals(HttpStatusCode.Unauthorized, client.get("/api/me").status)
-        assertEquals(HttpStatusCode.Unauthorized, client.get("/api/me") { header("Authorization", "Bearer not-a-jwt") }.status)
-    }
-
-    @Test fun designScenario() = run("design-${System.nanoTime()}") { c ->
+    @Test fun designScenario() = run { c ->
         val cats = c.get("/api/categories").body<List<CategoryDto>>().associateBy { it.name }
         fun cat(n: String) = cats.getValue(n).id
 
@@ -166,14 +160,4 @@ class ApiTest {
         assertTrue(ov.comingUp.any { it.name == "Gym" && it.date == "2026-11-18" })
     }
 
-    @Test fun usersCannotSeeEachOther() = testApplication {
-        Db.init(":memory:")
-        application { module(cfg, clock) }
-        val a = createClient { install(ContentNegotiation) { json(json) }; defaultRequest { header("Authorization", "Bearer dev:alice-${System.nanoTime()}"); contentType(ContentType.Application.Json) } }
-        val b = createClient { install(ContentNegotiation) { json(json) }; defaultRequest { header("Authorization", "Bearer dev:bob-${System.nanoTime()}"); contentType(ContentType.Application.Json) } }
-        val acc = a.post("/api/accounts") { setBody(AccountInput("Alice's", "current")) }.body<AccountDto>()
-        assertEquals(HttpStatusCode.NotFound, b.get("/api/accounts/${acc.id}/balances").status)
-        assertEquals(HttpStatusCode.NotFound, b.delete("/api/accounts/${acc.id}").status)
-        assertEquals(0, b.get("/api/accounts").body<List<AccountDto>>().size)
-    }
 }

@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
-import 'auth.dart';
 import 'config.dart';
 
 typedef J = Map<String, dynamic>;
@@ -18,8 +17,7 @@ class ApiException implements Exception {
 
 /// Thin JSON client for the Longview backend. Amounts are pence (int); dates are "yyyy-MM-dd".
 class Api {
-  Api(this.auth, {http.Client? client}) : _http = client ?? http.Client();
-  final AuthService auth;
+  Api({http.Client? client}) : _http = client ?? http.Client();
   final http.Client _http;
 
   /// Bumped after any write so screens know to reload.
@@ -31,18 +29,12 @@ class Api {
     return Uri.parse('${Config.apiBaseUrl}$path').replace(queryParameters: query.isEmpty ? null : query);
   }
 
-  Future<Map<String, String>> headers({String type = 'application/json'}) async {
-    final token = await auth.accessToken();
-    return {'Content-Type': type, if (token != null) 'Authorization': 'Bearer $token'};
-  }
+  Map<String, String> headers({String type = 'application/json'}) => {'Content-Type': type};
 
   Future<dynamic> _send(String method, String path, {Object? body, Map<String, String?>? query}) async {
-    final req = http.Request(method, _u(path, query))..headers.addAll(await headers());
+    final req = http.Request(method, _u(path, query))..headers.addAll(headers());
     if (body != null) req.body = jsonEncode(body);
     final res = await http.Response.fromStream(await _http.send(req));
-    if (res.statusCode == 401) {
-      throw ApiException(401, 'Please sign in again.');
-    }
     if (res.statusCode >= 400) {
       String msg = 'Something went wrong (${res.statusCode}).';
       try { msg = (jsonDecode(res.body) as J)['error'] as String? ?? msg; } catch (_) {}
@@ -60,7 +52,7 @@ class Api {
   Future<dynamic> delete(String path) => _send('DELETE', path);
 
   Future<void> uploadLogo(int accountId, Uint8List bytes, String contentType) async {
-    final res = await _http.put(_u('/api/accounts/$accountId/logo'), headers: await headers(type: contentType), body: bytes);
+    final res = await _http.put(_u('/api/accounts/$accountId/logo'), headers: headers(type: contentType), body: bytes);
     if (res.statusCode >= 400) throw ApiException(res.statusCode, 'Upload failed');
     _changed();
   }

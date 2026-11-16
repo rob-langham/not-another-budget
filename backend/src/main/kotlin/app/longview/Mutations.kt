@@ -25,7 +25,6 @@ import kotlin.math.abs
 
 class BadRequest(message: String) : RuntimeException(message)
 class NotFound(message: String = "Not found") : RuntimeException(message)
-class Unauthorized : RuntimeException("Sign in required")
 
 /** All writes. Each function must run inside a DB transaction. */
 object Mutations {

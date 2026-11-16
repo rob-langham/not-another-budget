@@ -1,7 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 
-import 'auth.dart';
 import 'screens/accounts.dart';
 import 'screens/amazon.dart';
 import 'screens/budget.dart';
@@ -76,7 +75,6 @@ class _SideNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final nav = context.watch<Nav>();
-    final auth = context.watch<AuthService>();
     return Container(
       color: C.side,
       padding: const EdgeInsets.fromLTRB(16, 28, 16, 16),
@@ -112,18 +110,6 @@ class _SideNav extends StatelessWidget {
               ),
             ),
           ),
-        const Spacer(),
-        if (auth.displayName != null)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Text(auth.displayName!, style: const TextStyle(color: C.sideText, fontSize: 13), overflow: TextOverflow.ellipsis),
-          ),
-        TextButton.icon(
-          style: TextButton.styleFrom(foregroundColor: C.sideText, alignment: Alignment.centerLeft, minimumSize: const Size(44, 44)),
-          onPressed: auth.logout,
-          icon: const Icon(Icons.logout, size: 18),
-          label: const Text('Sign out'),
-        ),
       ]),
     );
   }
