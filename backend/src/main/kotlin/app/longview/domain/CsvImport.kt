@@ -146,9 +146,9 @@ object CsvImport {
 
     /**
      * For a single amount column, decides whether positive means money out (credit cards, e.g. Amex) or money in.
-     * Payments/refunds are usually the odd ones out, so if most rows are positive, positive = out.
+     * A card repayment ("PAYMENT RECEIVED") shown as negative means positive = out; otherwise we go by the account type.
      */
-    fun detectSign(amounts: List<Long>, descriptions: List<String>): String {
+    fun detectSign(amounts: List<Long>, descriptions: List<String>, accountType: String? = null): String {
         val paymentWords = listOf("payment received", "thank you", "refund", "salary")
         val paymentIdx = descriptions.indices.filter { i -> paymentWords.any { descriptions[i].lowercase().contains(it) } }
         if (paymentIdx.isNotEmpty()) {
@@ -156,8 +156,8 @@ object CsvImport {
             if (neg * 2 > paymentIdx.size) return "positive_out"
             return "positive_in"
         }
-        val pos = amounts.count { it > 0 }
-        return if (pos * 3 > amounts.size * 2) "positive_out" else "positive_in"
+        // No payment lines to go on: card statements list purchases as positive, bank accounts list deposits as positive.
+        return if (accountType == "credit_card") "positive_out" else "positive_in"
     }
 
     fun toRows(rows: List<List<String>>, mapping: List<ColumnMatch>, dateFormat: String, sign: String): Pair<List<ParsedRow>, List<String>> {

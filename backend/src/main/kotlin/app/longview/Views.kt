@@ -41,9 +41,11 @@ class Views(private val l: Ledger, private val today: LocalDate, private val rec
 
     /** Logo order for "automatic": uploaded image → website icon → social picture → letter icon. */
     private fun logo(a: Acc): LogoDto {
-        fun site(w: String) = "https://www.google.com/s2/favicons?sz=128&domain=" + w.removePrefix("https://").removePrefix("http://").substringBefore('/')
-        fun social(h: String) = "https://unavatar.io/" + h.removePrefix("@")
-        val upload = if (a.hasUpload) "/api/accounts/${a.id}/logo" else null
+        // Every image goes through the API (see LogoFetcher) so browsers don't hit CORS and third parties never see the viewer.
+        val proxied = "/api/accounts/${a.id}/logo?v=" + (a.logoMode + a.logoWebsite + a.logoSocial + a.hasUpload).hashCode().toUInt().toString(16)
+        fun site(@Suppress("UNUSED_PARAMETER") w: String) = proxied
+        fun social(@Suppress("UNUSED_PARAMETER") h: String) = proxied
+        val upload = if (a.hasUpload) proxied else null
         val (resolved, url) = when (a.logoMode) {
             "upload" -> if (upload != null) "upload" to upload else "letter" to null
             "website" -> if (!a.logoWebsite.isNullOrBlank()) "website" to site(a.logoWebsite) else "letter" to null
@@ -61,16 +63,26 @@ class Views(private val l: Ledger, private val today: LocalDate, private val rec
 
     // ---------- transactions ----------
 
+    /** Payments that tick off a bill and have no category of their own take the bill's category. */
+    private val billCategory: Map<Long, Long> by lazy {
+        val byName = l.scheduled.filter { it.categoryId != null }.associate { it.name to it.categoryId!! }
+        l.transactions.map { YearMonth.from(it.date) }.distinct()
+            .flatMap { m -> billMatches(m).entries }
+            .mapNotNull { (txId, name) -> byName[name]?.let { txId to it } }.toMap()
+    }
+
+    private fun categoryOf(t: Tx): Long? = t.categoryId ?: if (t.awaitingReceipt) null else billCategory[t.id]
+
     /** Category spend lines for a transaction: its splits if it has any, else the whole amount. */
     private fun lines(t: Tx): List<Pair<Long?, Long>> =
         l.splitsByTx[t.id]?.takeIf { it.isNotEmpty() }?.map { it.categoryId to -abs(it.amount) * (if (t.amount < 0) 1 else -1) }
-            ?: listOf(t.categoryId to t.amount)
+            ?: listOf(categoryOf(t) to t.amount)
 
     private fun kindOf(catId: Long?) = catId?.let { l.catById[it]?.kind } ?: "spending"
 
     fun txDto(t: Tx, outliers: Set<Long> = emptySet(), planned: Map<Long, String> = emptyMap()) = TransactionDto(
         t.id, t.accountId, l.accById[t.accountId]?.name ?: "", t.date.toString(), t.time?.toString(),
-        t.merchant, t.description, t.amount, t.categoryId, t.ruleId?.let { l.ruleById[it]?.name }, t.manualCategory,
+        t.merchant, t.description, t.amount, categoryOf(t), t.ruleId?.let { l.ruleById[it]?.name }, t.manualCategory,
         t.awaitingReceipt, t.notes, l.splitsByTx[t.id].orEmpty().map { SplitDto(it.id, it.name, it.amount, it.categoryId) },
         t.id in outliers, planned[t.id],
     )
@@ -174,7 +186,7 @@ class Views(private val l: Ledger, private val today: LocalDate, private val rec
         val plannedLines = lines.filter { it.status != "not_due" }
         val planned = plannedLines.sumOf { it.amount }
         val used = lines.filter { it.group != "yearly" }.sumOf { it.used }
-        val income = incomeIn(month)
+        val income = if (month == YearMonth.from(today)) payCycleIncome() else incomeIn(month)
         return BudgetDto(
             month.toString(), planned, used, (planned - used).coerceAtLeast(0),
             if (income > 0) Math.round(planned * 100.0 / income).toInt() else null,
@@ -182,6 +194,11 @@ class Views(private val l: Ledger, private val today: LocalDate, private val rec
             lines.sortedWith(compareBy({ listOf("bill", "yearly", "pot").indexOf(it.group) })),
         )
     }
+
+    /** Income for the current pay cycle: everything received in the last 31 days (salary often lands just before the month starts). */
+    fun payCycleIncome(): Long = l.transactions.filter {
+        it.amount > 0 && kindOf(it.categoryId) == "income" && it.date.isAfter(today.minusDays(31)) && !it.date.isAfter(today)
+    }.sumOf { it.amount }
 
     fun incomeIn(month: YearMonth) = l.transactions.filter { YearMonth.from(it.date) == month && it.amount > 0 && kindOf(it.categoryId) == "income" }.sumOf { it.amount }
 
@@ -267,7 +284,7 @@ class Views(private val l: Ledger, private val today: LocalDate, private val rec
         val outAll = outliers()
         val accs = accounts()
         val goal = goal()
-        val income = incomeIn(cur)
+        val income = payCycleIncome()
         val outTotal = out.sumOf { -it.amount }
         val upcoming = l.scheduled.filter { it.group == "bill" }.flatMap { s ->
             s.repeat.occurrences(today.plusDays(7)).filter { !it.isBefore(today) }.map { d -> s to d }

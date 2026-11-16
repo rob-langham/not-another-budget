@@ -160,7 +160,7 @@ class ApiTest {
         assertEquals(200000 - 740 - 8060 - 5830L, bal.first().balance) // 16 Nov: recalculated from the override
 
         val ov = c.get("/api/overview").body<OverviewDto>()
-        assertEquals(0, ov.incomeThisMonth) // salary landed 31 Oct, so none yet in November
+        assertEquals(325000, ov.incomeThisMonth) // salary landed 31 Oct: counts for this pay cycle
         assertEquals(3, ov.accounts.size)
         assertEquals(ov.accounts.sumOf { it.balance }, ov.netPosition)
         assertTrue(ov.comingUp.any { it.name == "Gym" && it.date == "2026-11-18" })

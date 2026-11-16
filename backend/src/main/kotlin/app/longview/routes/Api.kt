@@ -205,8 +205,20 @@ fun Route.apiRoutes(cfg: AppConfig, today: () -> LocalDate) {
                 get("/{id}/logo") {
                     val uid = call.uid(); val id = call.idParam()
                     val row = tx { ownsAccount(uid, id); Accounts.selectAll().where { Accounts.id eq id }.single() }
-                    val img = row[Accounts.logoImage] ?: throw NotFound("No uploaded logo")
-                    call.respondBytes(img.bytes, ContentType.parse(row[Accounts.logoContentType] ?: "image/png"))
+                    val upload = row[Accounts.logoImage]
+                    val site = row[Accounts.logoWebsite]?.takeIf { it.isNotBlank() }
+                    val social = row[Accounts.logoSocial]?.takeIf { it.isNotBlank() }
+                    val mode = row[Accounts.logoMode]
+                    // Same order as the "Automatic" option: upload → website → social.
+                    val candidates = buildList<() -> app.longview.domain.LogoFetcher.Image?> {
+                        if (mode in setOf("automatic", "upload") && upload != null) add { app.longview.domain.LogoFetcher.Image(upload.bytes, row[Accounts.logoContentType] ?: "image/png") }
+                        if (mode in setOf("automatic", "website") && site != null) add { app.longview.domain.LogoFetcher.fetch(app.longview.domain.LogoFetcher.websiteUrl(site)) }
+                        if (mode in setOf("automatic", "social") && social != null) add { app.longview.domain.LogoFetcher.fetch(app.longview.domain.LogoFetcher.socialUrl(social)) }
+                    }
+                    val img = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { candidates.firstNotNullOfOrNull { it() } }
+                        ?: throw NotFound("No logo found")
+                    call.response.headers.append("Cache-Control", "private, max-age=86400")
+                    call.respondBytes(img.bytes, ContentType.parse(img.contentType))
                 }
                 post("/{id}/sync") {
                     // Bank links need an open-banking provider (e.g. TrueLayer, GoCardless). Not wired up yet.
@@ -477,7 +489,8 @@ fun Route.apiRoutes(cfg: AppConfig, today: () -> LocalDate) {
                         val descCol = mapping.indexOfFirst { it.use == "description" }
                         val sign = when {
                             usedSaved -> saved!!.sign
-                            amountCol >= 0 -> CsvImport.detectSign(body.mapNotNull { Money.parse(it.getOrNull(amountCol)) }, body.map { it.getOrNull(descCol).orEmpty() })
+                            amountCol >= 0 -> CsvImport.detectSign(body.mapNotNull { Money.parse(it.getOrNull(amountCol)) }, body.map { it.getOrNull(descCol).orEmpty() },
+                                Accounts.selectAll().where { Accounts.id eq b.accountId }.single()[Accounts.type])
                             else -> "positive_in"
                         }
                         val (parsed, errors) = CsvImport.toRows(body, mapping, dateFormat, sign)

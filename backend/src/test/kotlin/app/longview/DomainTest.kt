@@ -70,6 +70,8 @@ class DomainTest {
         assertEquals("dmy", CsvImport.detectDateFormat(rows.drop(1).map { it[0] }))
         val sign = CsvImport.detectSign(rows.drop(1).map { Money.parse(it[2])!! }, rows.drop(1).map { it[1] })
         assertEquals("positive_out", sign)
+        // A savings file with only deposits stays positive = money in.
+        assertEquals("positive_in", CsvImport.detectSign(listOf(16000, 42000), listOf("From Monzo", "From Monzo"), "savings"))
         val (parsed, errors) = CsvImport.toRows(rows.drop(1), m, "dmy", sign)
         assertTrue(errors.isEmpty())
         assertEquals(-6497, parsed[0].amount)
